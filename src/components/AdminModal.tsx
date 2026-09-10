@@ -51,12 +51,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'Scienti@dmin' || password === 'admin123' || password === 'admin') {
+    if (password === 'Scienti@dmin' || password === 'Shanu@dmin' || password === '@dminedu') {
       db.setAdminAuthenticated(true);
       onLoginSuccess();
       setAuthError('');
     } else {
-      setAuthError('Invalid Admin Password. Password is Scienti@dmin');
+      setAuthError('Invalid Admin Password');
     }
   };
 
@@ -190,7 +190,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   <p className="text-xs text-rose-600 font-medium mt-1">{authError}</p>
                 )}
                 <p className="text-[11px] text-slate-400 mt-1.5">
-                  Admin Password: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">Scienti@dmin</code>
+                  Admin Password: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono"></code>
                 </p>
               </div>
 
