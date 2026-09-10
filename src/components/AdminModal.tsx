@@ -178,7 +178,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 <div className="relative">
                   <input
                     type="password"
-                    placeholder="Enter password (Scienti@dmin)"
+                    placeholder="Enter password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full h-11 pl-10 pr-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
