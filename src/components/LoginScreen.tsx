@@ -148,7 +148,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Enter REG Number (e.g. REG-2026-701)"
+                      placeholder="Enter REG Number (e.g. 26SSLCXX)"
                       value={regNumberInput}
                       onChange={(e) => setRegNumberInput(e.target.value)}
                       className="w-full h-12 pl-10 pr-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 uppercase"
@@ -225,7 +225,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   )}
 
                   <p className="text-[11px] text-slate-400 mt-2">
-                    Admin Password: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">Scienti@dmin</code>
+                    Admin Password: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono"></code>
                   </p>
                 </div>
 
