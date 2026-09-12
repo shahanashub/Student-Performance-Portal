@@ -1,6 +1,6 @@
 import type { Student, Activity } from '../types';
 import { INITIAL_STUDENTS, INITIAL_ACTIVITIES } from './sampleData';
-import { pushToCloud, fetchFromCloud, getStoredSyncId } from './cloudSync';
+import { pushToCloud, fetchFromCloud } from './cloudSync';
 
 const STUDENTS_KEY = 'spp_students_v1';
 const ACTIVITIES_KEY = 'spp_activities_v1';
@@ -88,9 +88,8 @@ export class LocalDatabaseService {
     if (this.isSyncing) return false;
     this.isSyncing = true;
     try {
-      const syncId = getStoredSyncId();
-      const cloudData = await fetchFromCloud(syncId);
-      if (cloudData && cloudData.students) {
+      const cloudData = await fetchFromCloud();
+      if (cloudData && Array.isArray(cloudData.students)) {
         const deletedStudents = this.getDeletedStudentIds();
         const deletedActivities = this.getDeletedActivityIds();
 
@@ -122,8 +121,7 @@ export class LocalDatabaseService {
     try {
       const students = this.getStudents();
       const activities = this.getActivities();
-      const syncId = getStoredSyncId();
-      const success = await pushToCloud(students, activities, syncId);
+      const success = await pushToCloud(students, activities);
       if (success) {
         localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
       }
@@ -238,9 +236,6 @@ export class LocalDatabaseService {
     this.saveStudents(students);
   }
 
-  /**
-   * PERMANENT DELETION: Removes student by StudentID & RegistrationNumber, registers tombstones, and cascades activity deletion
-   */
   public deleteStudent(studentId: string): void {
     const target = this.getStudentById(studentId);
     this.addDeletedStudentId(studentId);
@@ -279,9 +274,6 @@ export class LocalDatabaseService {
     this.saveActivities(activities);
   }
 
-  /**
-   * PERMANENT DELETION: Removes activity, registers tombstone, and syncs
-   */
   public deleteActivity(activityId: string): void {
     this.addDeletedActivityId(activityId);
 

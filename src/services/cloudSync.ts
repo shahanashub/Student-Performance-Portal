@@ -1,7 +1,7 @@
 import type { Student, Activity } from '../types';
 
-const CLOUD_SYNC_KEY = 'spp_cloud_sync_id_v1';
-const DEFAULT_SYNC_ID = 'spp-sci-edu-portal-2026';
+// Permanent Shared Master Cloud Database ID
+export const MASTER_CLOUD_DB_ID = 'ff808181a067127101a0946afa3e7fb9';
 
 export interface CloudPayload {
   students: Student[];
@@ -9,13 +9,19 @@ export interface CloudPayload {
   updatedAt: string;
 }
 
-export async function fetchFromCloud(syncId: string = DEFAULT_SYNC_ID): Promise<CloudPayload | null> {
+/**
+ * Fetch live students & activities from central cloud database
+ */
+export async function fetchFromCloud(): Promise<CloudPayload | null> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 sec timeout max
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    const response = await fetch(`https://api.restful-api.dev/objects/${encodeURIComponent(syncId)}`, {
+    const response = await fetch(`https://api.restful-api.dev/objects/${MASTER_CLOUD_DB_ID}`, {
       method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
       signal: controller.signal,
     }).catch(() => null);
 
@@ -35,10 +41,12 @@ export async function fetchFromCloud(syncId: string = DEFAULT_SYNC_ID): Promise<
   }
 }
 
+/**
+ * Push live student & activity updates to central cloud database so all mobile phones & PCs match instantly
+ */
 export async function pushToCloud(
   students: Student[],
-  activities: Activity[],
-  syncId: string = DEFAULT_SYNC_ID
+  activities: Activity[]
 ): Promise<boolean> {
   try {
     const payload: CloudPayload = {
@@ -48,17 +56,16 @@ export async function pushToCloud(
     };
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const response = await fetch('https://api.restful-api.dev/objects', {
-      method: 'POST',
+    const response = await fetch(`https://api.restful-api.dev/objects/${MASTER_CLOUD_DB_ID}`, {
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
       },
       signal: controller.signal,
       body: JSON.stringify({
-        id: syncId,
-        name: 'SPP_Cloud_Data',
+        name: 'SPP_SHARED_DATABASE',
         data: payload,
       }),
     }).catch(() => null);
@@ -68,21 +75,5 @@ export async function pushToCloud(
   } catch (error) {
     console.warn('Cloud sync push warning:', error);
     return false;
-  }
-}
-
-export function getStoredSyncId(): string {
-  try {
-    return localStorage.getItem(CLOUD_SYNC_KEY) || DEFAULT_SYNC_ID;
-  } catch {
-    return DEFAULT_SYNC_ID;
-  }
-}
-
-export function setStoredSyncId(syncId: string): void {
-  try {
-    localStorage.setItem(CLOUD_SYNC_KEY, syncId);
-  } catch {
-    // ignore
   }
 }
