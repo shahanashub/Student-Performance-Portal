@@ -1,8 +1,7 @@
 import type { Student, Activity } from '../types';
 
-// Cloud Sync configuration
 const CLOUD_SYNC_KEY = 'spp_cloud_sync_id_v1';
-const DEFAULT_SYNC_ID = 'spp-sci-edu-portal-2026'; // Default shared sync ID for instant multi-device sync
+const DEFAULT_SYNC_ID = 'spp-sci-edu-portal-2026';
 
 export interface CloudPayload {
   students: Student[];
@@ -10,32 +9,25 @@ export interface CloudPayload {
   updatedAt: string;
 }
 
-/**
- * Fetch latest students & activities from the cloud storage endpoint.
- */
 export async function fetchFromCloud(syncId: string = DEFAULT_SYNC_ID): Promise<CloudPayload | null> {
   try {
-    const response = await fetch(`https://api.jsonbin.io/v3/b/${encodeURIComponent(syncId)}`, {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 sec timeout max
+
+    const response = await fetch(`https://api.restful-api.dev/objects/${encodeURIComponent(syncId)}`, {
       method: 'GET',
-      headers: {
-        'X-Bin-Meta': 'false',
-      },
-    });
+      signal: controller.signal,
+    }).catch(() => null);
 
-    if (!response.ok) {
-      // Try fallback endpoint or key-value storage
-      const fallbackRes = await fetch(`https://api.restful-api.dev/objects/${encodeURIComponent(syncId)}`);
-      if (fallbackRes.ok) {
-        const data = await fallbackRes.json();
-        return data.data as CloudPayload;
+    clearTimeout(timeoutId);
+
+    if (response && response.ok) {
+      const result = await response.json().catch(() => null);
+      if (result && result.data && Array.isArray(result.data.students)) {
+        return result.data as CloudPayload;
       }
-      return null;
     }
 
-    const data = await response.json();
-    if (data && Array.isArray(data.students) && Array.isArray(data.activities)) {
-      return data as CloudPayload;
-    }
     return null;
   } catch (error) {
     console.warn('Cloud sync fetch warning:', error);
@@ -43,9 +35,6 @@ export async function fetchFromCloud(syncId: string = DEFAULT_SYNC_ID): Promise<
   }
 }
 
-/**
- * Push latest students & activities to the cloud storage endpoint so all devices (phones & PCs) get updated data.
- */
 export async function pushToCloud(
   students: Student[],
   activities: Activity[],
@@ -58,20 +47,24 @@ export async function pushToCloud(
       updatedAt: new Date().toISOString(),
     };
 
-    // Use a public key-value sync service or rest API endpoint
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
     const response = await fetch('https://api.restful-api.dev/objects', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
+      signal: controller.signal,
       body: JSON.stringify({
         id: syncId,
         name: 'SPP_Cloud_Data',
         data: payload,
       }),
-    });
+    }).catch(() => null);
 
-    return response.ok;
+    clearTimeout(timeoutId);
+    return !!(response && response.ok);
   } catch (error) {
     console.warn('Cloud sync push warning:', error);
     return false;
@@ -79,9 +72,17 @@ export async function pushToCloud(
 }
 
 export function getStoredSyncId(): string {
-  return localStorage.getItem(CLOUD_SYNC_KEY) || DEFAULT_SYNC_ID;
+  try {
+    return localStorage.getItem(CLOUD_SYNC_KEY) || DEFAULT_SYNC_ID;
+  } catch {
+    return DEFAULT_SYNC_ID;
+  }
 }
 
 export function setStoredSyncId(syncId: string): void {
-  localStorage.setItem(CLOUD_SYNC_KEY, syncId);
+  try {
+    localStorage.setItem(CLOUD_SYNC_KEY, syncId);
+  } catch {
+    // ignore
+  }
 }
