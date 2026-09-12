@@ -96,7 +96,7 @@ export class LocalDatabaseService {
         const cleanStudents = cloudData.students.filter(
           (s) =>
             !deletedStudents.has(s.StudentID.toUpperCase()) &&
-            !deletedStudents.has(s.RegistrationNumber.toUpperCase())
+            !deletedStudents.has((s.RegistrationNumber || '').toUpperCase())
         );
         const cleanActivities = (cloudData.activities || []).filter(
           (a) =>
@@ -139,7 +139,7 @@ export class LocalDatabaseService {
       return rawStudents.filter(
         (s) =>
           !deletedSet.has(s.StudentID.toUpperCase()) &&
-          !deletedSet.has(s.RegistrationNumber.toUpperCase())
+          !deletedSet.has((s.RegistrationNumber || '').toUpperCase())
       );
     } catch {
       return INITIAL_STUDENTS;
@@ -168,10 +168,11 @@ export class LocalDatabaseService {
   }
 
   public getStudentById(studentId: string): Student | undefined {
+    const query = studentId.toUpperCase();
     return this.getStudents().find(
       (s) =>
-        s.StudentID.toUpperCase() === studentId.toUpperCase() ||
-        s.RegistrationNumber.toUpperCase() === studentId.toUpperCase()
+        s.StudentID.toUpperCase() === query ||
+        (s.RegistrationNumber && s.RegistrationNumber.toUpperCase() === query)
     );
   }
 
@@ -221,9 +222,16 @@ export class LocalDatabaseService {
   public addStudent(student: Omit<Student, 'StudentID'> & { StudentID?: string }): Student {
     const students = this.getStudents();
     const newId = student.StudentID || `STU-${Date.now().toString().slice(-4)}`;
+    
+    // Auto-generate Registration Number if blank
+    const regNo = student.RegistrationNumber && student.RegistrationNumber.trim() !== ''
+      ? student.RegistrationNumber.trim()
+      : `REG-2026-${Math.floor(100 + Math.random() * 900)}`;
+
     const newStudent: Student = {
       ...student,
       StudentID: newId,
+      RegistrationNumber: regNo,
       CreatedAt: new Date().toISOString(),
     };
     students.push(newStudent);
@@ -232,7 +240,12 @@ export class LocalDatabaseService {
   }
 
   public updateStudent(updated: Student): void {
-    const students = this.getStudents().map((s) => (s.StudentID === updated.StudentID ? updated : s));
+    const regNo = updated.RegistrationNumber && updated.RegistrationNumber.trim() !== ''
+      ? updated.RegistrationNumber.trim()
+      : `REG-2026-${updated.StudentID.replace(/\D/g, '') || Math.floor(100 + Math.random() * 900)}`;
+    const sanitized = { ...updated, RegistrationNumber: regNo };
+
+    const students = this.getStudents().map((s) => (s.StudentID === updated.StudentID ? sanitized : s));
     this.saveStudents(students);
   }
 
@@ -300,11 +313,16 @@ export class LocalDatabaseService {
     const studentMap = new Map(currentStudents.map((s) => [s.StudentID, s]));
     let addedStudents = 0;
     newStudents.forEach((s) => {
+      const regNo = s.RegistrationNumber && s.RegistrationNumber.trim() !== ''
+        ? s.RegistrationNumber.trim()
+        : `REG-2026-${Math.floor(100 + Math.random() * 900)}`;
+      const cleanStudent = { ...s, RegistrationNumber: regNo };
+
       if (!studentMap.has(s.StudentID)) {
-        studentMap.set(s.StudentID, s);
+        studentMap.set(s.StudentID, cleanStudent);
         addedStudents++;
       } else {
-        studentMap.set(s.StudentID, { ...studentMap.get(s.StudentID)!, ...s });
+        studentMap.set(s.StudentID, { ...studentMap.get(s.StudentID)!, ...cleanStudent });
       }
     });
 

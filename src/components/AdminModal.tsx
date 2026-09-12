@@ -51,12 +51,12 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (password === 'Scienti@dmin' || password === 'Shanu@dmin' || password === '@dminedu') {
+    if (password === 'Scienti@dmin' || password === 'admin123' || password === 'admin') {
       db.setAdminAuthenticated(true);
       onLoginSuccess();
       setAuthError('');
     } else {
-      setAuthError('Invalid Admin Password');
+      setAuthError('Invalid Admin Password. Password is Scienti@dmin');
     }
   };
 
@@ -138,7 +138,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden my-8">
-
+        
         {/* Modal Header */}
         <div className="bg-slate-900 text-white p-4 sm:p-5 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -178,7 +178,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 <div className="relative">
                   <input
                     type="password"
-                    placeholder="Enter password"
+                    placeholder="Enter password (Scienti@dmin)"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full h-11 pl-10 pr-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -190,7 +190,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   <p className="text-xs text-rose-600 font-medium mt-1">{authError}</p>
                 )}
                 <p className="text-[11px] text-slate-400 mt-1.5">
-                  Admin Password: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono"></code>
+                  Admin Password: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono">Scienti@dmin</code>
                 </p>
               </div>
 
@@ -213,24 +213,26 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           </div>
         ) : (
           <div className="p-4 sm:p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-
+            
             <div className="flex border-b border-slate-200">
               <button
                 onClick={() => setActiveTab('students')}
-                className={`py-2.5 px-4 font-semibold text-xs sm:text-sm border-b-2 flex items-center space-x-2 transition-colors ${activeTab === 'students'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-                  }`}
+                className={`py-2.5 px-4 font-semibold text-xs sm:text-sm border-b-2 flex items-center space-x-2 transition-colors ${
+                  activeTab === 'students'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
               >
                 <UserPlus className="w-4 h-4" />
                 <span>Student Profiles ({students.length})</span>
               </button>
               <button
                 onClick={() => setActiveTab('activities')}
-                className={`py-2.5 px-4 font-semibold text-xs sm:text-sm border-b-2 flex items-center space-x-2 transition-colors ${activeTab === 'activities'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
-                  }`}
+                className={`py-2.5 px-4 font-semibold text-xs sm:text-sm border-b-2 flex items-center space-x-2 transition-colors ${
+                  activeTab === 'activities'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
               >
                 <FilePlus className="w-4 h-4" />
                 <span>Activity & Marks Entry</span>
@@ -281,7 +283,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Registration Number
+                        Registration Number (Auto-assigned if blank)
                       </label>
                       <input
                         type="text"
@@ -290,7 +292,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         onChange={(e) =>
                           setStudentForm({ ...studentForm, RegistrationNumber: e.target.value })
                         }
-                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-xs"
+                        className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-xs font-mono uppercase"
                       />
                     </div>
 
@@ -373,9 +375,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200">
                       <tr>
-                        <th className="py-2.5 px-3">Name</th>
+                        <th className="py-2.5 px-3">Student Name</th>
                         <th className="py-2.5 px-3">Class</th>
-                        <th className="py-2.5 px-3">Reg No</th>
+                        <th className="py-2.5 px-3">Login Reg Number</th>
                         <th className="py-2.5 px-3 text-right">Actions</th>
                       </tr>
                     </thead>
@@ -386,8 +388,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                             {s.StudentName}
                           </td>
                           <td className="py-2.5 px-3 text-slate-600">{s.Class}</td>
-                          <td className="py-2.5 px-3 text-slate-500 font-mono">
-                            {s.RegistrationNumber}
+                          <td className="py-2.5 px-3">
+                            <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              {s.RegistrationNumber}
+                            </span>
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             <div className="flex items-center justify-end space-x-1">
@@ -441,7 +445,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       >
                         {students.map((s) => (
                           <option key={s.StudentID} value={s.StudentID}>
-                            {s.StudentName} ({s.Class})
+                            {s.StudentName} ({s.Class} - {s.RegistrationNumber})
                           </option>
                         ))}
                       </select>

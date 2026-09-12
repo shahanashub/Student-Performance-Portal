@@ -25,23 +25,46 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
   const handleStudentSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const query = regNumberInput.trim().toUpperCase();
-    if (!query) {
+    const rawInput = regNumberInput.trim();
+    if (!rawInput) {
       setStudentError('Please enter your Registration Number.');
+      return;
+    }
+
+    const normalize = (str: string) => (str || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanInput = normalize(rawInput);
+    const lowerInput = rawInput.toLowerCase();
+
+    // Check if input was registered as a deleted student
+    if (db.isStudentDeleted(rawInput) || db.isStudentDeleted(cleanInput)) {
+      setStudentError('This student record has been removed by the administrator.');
       return;
     }
 
     // Always fetch latest non-deleted active students from DB
     const activeStudents = db.getStudents();
-    const matchedStudent = activeStudents.find(
-      (s) => s.RegistrationNumber.toUpperCase() === query || s.StudentID.toUpperCase() === query
-    );
+    
+    // Smart flexible matcher: Matches Registration Number, Student ID, Phone, or Name
+    const matchedStudent = activeStudents.find((s) => {
+      const normReg = normalize(s.RegistrationNumber);
+      const normId = normalize(s.StudentID);
+      const normPhone = normalize(s.ContactNumber);
+      const normName = (s.StudentName || '').toLowerCase().trim();
+
+      return (
+        normReg === cleanInput ||
+        normId === cleanInput ||
+        (normReg.length > 0 && cleanInput.length >= 3 && normReg.includes(cleanInput)) ||
+        (normPhone.length > 0 && cleanInput.length >= 4 && normPhone.endsWith(cleanInput)) ||
+        normName === lowerInput
+      );
+    });
 
     if (matchedStudent) {
       setStudentError('');
       onStudentLogin(matchedStudent.StudentID);
     } else {
-      setStudentError(`Registration Number not found or student record has been removed.`);
+      setStudentError(`Registration Number "${rawInput}" not found. Please check spelling or contact Administrator.`);
     }
   };
 
