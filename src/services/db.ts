@@ -49,10 +49,17 @@ export class LocalDatabaseService {
     }
   }
 
-  private addDeletedStudentId(id: string): void {
+  public addDeletedStudentId(id: string): void {
+    if (!id) return;
     const set = this.getDeletedStudentIds();
-    set.add(id);
+    set.add(id.trim().toUpperCase());
     localStorage.setItem(DELETED_STUDENTS_KEY, JSON.stringify(Array.from(set)));
+  }
+
+  public isStudentDeleted(query: string): boolean {
+    if (!query) return false;
+    const set = this.getDeletedStudentIds();
+    return set.has(query.trim().toUpperCase());
   }
 
   private getDeletedActivityIds(): Set<string> {
@@ -64,10 +71,17 @@ export class LocalDatabaseService {
     }
   }
 
-  private addDeletedActivityId(id: string): void {
+  public addDeletedActivityId(id: string): void {
+    if (!id) return;
     const set = this.getDeletedActivityIds();
-    set.add(id);
+    set.add(id.trim().toUpperCase());
     localStorage.setItem(DELETED_ACTIVITIES_KEY, JSON.stringify(Array.from(set)));
+  }
+
+  public isActivityDeleted(id: string): boolean {
+    if (!id) return false;
+    const set = this.getDeletedActivityIds();
+    return set.has(id.trim().toUpperCase());
   }
 
   public async syncFromCloudSilently(): Promise<boolean> {
@@ -80,10 +94,15 @@ export class LocalDatabaseService {
         const deletedStudents = this.getDeletedStudentIds();
         const deletedActivities = this.getDeletedActivityIds();
 
-        // Filter out deleted records from cloud data
-        const cleanStudents = cloudData.students.filter(s => !deletedStudents.has(s.StudentID));
+        const cleanStudents = cloudData.students.filter(
+          (s) =>
+            !deletedStudents.has(s.StudentID.toUpperCase()) &&
+            !deletedStudents.has(s.RegistrationNumber.toUpperCase())
+        );
         const cleanActivities = (cloudData.activities || []).filter(
-          a => !deletedActivities.has(a.ActivityID) && !deletedStudents.has(a.StudentID)
+          (a) =>
+            !deletedActivities.has(a.ActivityID.toUpperCase()) &&
+            !deletedStudents.has(a.StudentID.toUpperCase())
         );
 
         localStorage.setItem(STUDENTS_KEY, JSON.stringify(cleanStudents));
@@ -119,7 +138,11 @@ export class LocalDatabaseService {
       const data = localStorage.getItem(STUDENTS_KEY);
       const rawStudents: Student[] = data ? JSON.parse(data) : INITIAL_STUDENTS;
       const deletedSet = this.getDeletedStudentIds();
-      return rawStudents.filter((s) => !deletedSet.has(s.StudentID));
+      return rawStudents.filter(
+        (s) =>
+          !deletedSet.has(s.StudentID.toUpperCase()) &&
+          !deletedSet.has(s.RegistrationNumber.toUpperCase())
+      );
     } catch {
       return INITIAL_STUDENTS;
     }
@@ -147,7 +170,11 @@ export class LocalDatabaseService {
   }
 
   public getStudentById(studentId: string): Student | undefined {
-    return this.getStudents().find((s) => s.StudentID === studentId);
+    return this.getStudents().find(
+      (s) =>
+        s.StudentID.toUpperCase() === studentId.toUpperCase() ||
+        s.RegistrationNumber.toUpperCase() === studentId.toUpperCase()
+    );
   }
 
   public getActivities(): Activity[] {
@@ -157,7 +184,9 @@ export class LocalDatabaseService {
       const deletedActivities = this.getDeletedActivityIds();
       const deletedStudents = this.getDeletedStudentIds();
       return rawActivities.filter(
-        (a) => !deletedActivities.has(a.ActivityID) && !deletedStudents.has(a.StudentID)
+        (a) =>
+          !deletedActivities.has(a.ActivityID.toUpperCase()) &&
+          !deletedStudents.has(a.StudentID.toUpperCase())
       );
     } catch {
       return INITIAL_ACTIVITIES;
@@ -166,13 +195,13 @@ export class LocalDatabaseService {
 
   public getActivitiesForStudent(studentId: string): Activity[] {
     const deletedStudents = this.getDeletedStudentIds();
-    if (deletedStudents.has(studentId)) {
+    if (deletedStudents.has(studentId.toUpperCase())) {
       return [];
     }
 
     const allActivities = this.getActivities();
     return allActivities
-      .filter((act) => act.StudentID === studentId)
+      .filter((act) => act.StudentID.toUpperCase() === studentId.toUpperCase())
       .filter((act) => {
         const hasScore = act.Score !== null && act.Score !== undefined && !isNaN(Number(act.Score));
         const isExplicitStatus = act.Status === 'Absent' || act.Status === 'Not Completed' || act.Status === 'Completed' || act.Status === 'Attended';
@@ -210,16 +239,25 @@ export class LocalDatabaseService {
   }
 
   /**
-   * PERMANENT DELETION: Removes student from LocalStorage, registers tombstone, and cascades activity deletion
+   * PERMANENT DELETION: Removes student by StudentID & RegistrationNumber, registers tombstones, and cascades activity deletion
    */
   public deleteStudent(studentId: string): void {
+    const target = this.getStudentById(studentId);
     this.addDeletedStudentId(studentId);
+    if (target) {
+      if (target.StudentID) this.addDeletedStudentId(target.StudentID);
+      if (target.RegistrationNumber) this.addDeletedStudentId(target.RegistrationNumber);
+    }
 
-    const students = this.getStudents().filter((s) => s.StudentID !== studentId);
-    localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+    const remainingStudents = this.getStudents().filter(
+      (s) => s.StudentID.toUpperCase() !== studentId.toUpperCase()
+    );
+    localStorage.setItem(STUDENTS_KEY, JSON.stringify(remainingStudents));
 
-    const activities = this.getActivities().filter((a) => a.StudentID !== studentId);
-    localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(activities));
+    const remainingActivities = this.getActivities().filter(
+      (a) => a.StudentID.toUpperCase() !== studentId.toUpperCase()
+    );
+    localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(remainingActivities));
 
     this.syncToCloud();
   }
@@ -242,12 +280,14 @@ export class LocalDatabaseService {
   }
 
   /**
-   * PERMANENT DELETION: Removes activity from LocalStorage, registers tombstone, and syncs
+   * PERMANENT DELETION: Removes activity, registers tombstone, and syncs
    */
   public deleteActivity(activityId: string): void {
     this.addDeletedActivityId(activityId);
 
-    const activities = this.getActivities().filter((a) => a.ActivityID !== activityId);
+    const activities = this.getActivities().filter(
+      (a) => a.ActivityID.toUpperCase() !== activityId.toUpperCase()
+    );
     localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(activities));
 
     this.syncToCloud();

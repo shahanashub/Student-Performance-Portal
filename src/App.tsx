@@ -50,13 +50,34 @@ export function App() {
     setClasses(allClasses);
   };
 
+  // Logout Handler
+  const handleLogout = () => {
+    setAuthMode('unauthenticated');
+    setLoggedInStudentId(null);
+    db.setAdminAuthenticated(false);
+    localStorage.removeItem(AUTH_MODE_KEY);
+    localStorage.removeItem(AUTH_STUDENT_ID_KEY);
+  };
+
   useEffect(() => {
     refreshData();
-    // Silently pull latest cloud data on load to keep Phone & Desktop in sync
+    // Pull latest cloud data on mount
     db.syncFromCloudSilently().then((updated) => {
       if (updated) refreshData();
     });
   }, []);
+
+  // VERIFY ACTIVE STUDENT SESSION:
+  // If student is logged in, but their record was deleted by Admin -> Force Logout!
+  useEffect(() => {
+    if (authMode === 'student' && loggedInStudentId) {
+      const activeStudent = db.getStudentById(loggedInStudentId);
+      const isDeleted = db.isStudentDeleted(loggedInStudentId);
+      if (!activeStudent || isDeleted) {
+        handleLogout();
+      }
+    }
+  }, [students, authMode, loggedInStudentId]);
 
   // Filter students based on selected class and search query (for Admin view)
   const filteredStudents = useMemo(() => {
@@ -107,15 +128,6 @@ export function App() {
     }
   };
 
-  // Logout Handler
-  const handleLogout = () => {
-    setAuthMode('unauthenticated');
-    setLoggedInStudentId(null);
-    db.setAdminAuthenticated(false);
-    localStorage.removeItem(AUTH_MODE_KEY);
-    localStorage.removeItem(AUTH_STUDENT_ID_KEY);
-  };
-
   // Handle Class change in Admin mode
   const handleSelectClass = (className: string) => {
     setSelectedClass(className);
@@ -134,10 +146,11 @@ export function App() {
 
   // Get active student object
   const currentStudent = useMemo(() => {
-    return students.find((s) => s.StudentID === activeStudentId);
-  }, [students, activeStudentId]);
+    if (!activeStudentId) return undefined;
+    return db.getStudentById(activeStudentId);
+  }, [activeStudentId, students]);
 
-  // Get activities for currently selected student
+  // Get activities for currently selected student (Hidden missing activities enforced)
   const currentStudentActivities = useMemo<Activity[]>(() => {
     if (!activeStudentId) return [];
     return db.getActivitiesForStudent(activeStudentId);
@@ -160,8 +173,8 @@ export function App() {
     }
   };
 
-  // IF UNAUTHENTICATED -> SHOW LOGIN SCREEN
-  if (authMode === 'unauthenticated') {
+  // IF UNAUTHENTICATED OR STUDENT ACCOUNT DELETED -> SHOW LOGIN SCREEN
+  if (authMode === 'unauthenticated' || (authMode === 'student' && !currentStudent)) {
     return (
       <LoginScreen
         students={students}
