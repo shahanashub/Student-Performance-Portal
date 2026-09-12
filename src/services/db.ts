@@ -4,6 +4,8 @@ import { pushToCloud, fetchFromCloud, getStoredSyncId } from './cloudSync';
 
 const STUDENTS_KEY = 'spp_students_v1';
 const ACTIVITIES_KEY = 'spp_activities_v1';
+const DELETED_STUDENTS_KEY = 'spp_deleted_students_v1';
+const DELETED_ACTIVITIES_KEY = 'spp_deleted_activities_v1';
 const ADMIN_AUTH_KEY = 'spp_admin_auth_v1';
 const LAST_SYNC_KEY = 'spp_last_cloud_sync_v1';
 
@@ -13,7 +15,6 @@ export class LocalDatabaseService {
 
   private constructor() {
     this.initDatabase();
-    // Auto-fetch latest cloud data on startup to sync across mobile & desktop
     this.syncFromCloudSilently();
   }
 
@@ -31,20 +32,62 @@ export class LocalDatabaseService {
     if (!localStorage.getItem(ACTIVITIES_KEY)) {
       localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(INITIAL_ACTIVITIES));
     }
+    if (!localStorage.getItem(DELETED_STUDENTS_KEY)) {
+      localStorage.setItem(DELETED_STUDENTS_KEY, JSON.stringify([]));
+    }
+    if (!localStorage.getItem(DELETED_ACTIVITIES_KEY)) {
+      localStorage.setItem(DELETED_ACTIVITIES_KEY, JSON.stringify([]));
+    }
   }
 
-  /**
-   * Silently pull latest student records from Cloud to ensure Mobile & PC match
-   */
+  private getDeletedStudentIds(): Set<string> {
+    try {
+      const data = localStorage.getItem(DELETED_STUDENTS_KEY);
+      return new Set(data ? JSON.parse(data) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  private addDeletedStudentId(id: string): void {
+    const set = this.getDeletedStudentIds();
+    set.add(id);
+    localStorage.setItem(DELETED_STUDENTS_KEY, JSON.stringify(Array.from(set)));
+  }
+
+  private getDeletedActivityIds(): Set<string> {
+    try {
+      const data = localStorage.getItem(DELETED_ACTIVITIES_KEY);
+      return new Set(data ? JSON.parse(data) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  private addDeletedActivityId(id: string): void {
+    const set = this.getDeletedActivityIds();
+    set.add(id);
+    localStorage.setItem(DELETED_ACTIVITIES_KEY, JSON.stringify(Array.from(set)));
+  }
+
   public async syncFromCloudSilently(): Promise<boolean> {
     if (this.isSyncing) return false;
     this.isSyncing = true;
     try {
       const syncId = getStoredSyncId();
       const cloudData = await fetchFromCloud(syncId);
-      if (cloudData && cloudData.students && cloudData.students.length > 0) {
-        localStorage.setItem(STUDENTS_KEY, JSON.stringify(cloudData.students));
-        localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(cloudData.activities || []));
+      if (cloudData && cloudData.students) {
+        const deletedStudents = this.getDeletedStudentIds();
+        const deletedActivities = this.getDeletedActivityIds();
+
+        // Filter out deleted records from cloud data
+        const cleanStudents = cloudData.students.filter(s => !deletedStudents.has(s.StudentID));
+        const cleanActivities = (cloudData.activities || []).filter(
+          a => !deletedActivities.has(a.ActivityID) && !deletedStudents.has(a.StudentID)
+        );
+
+        localStorage.setItem(STUDENTS_KEY, JSON.stringify(cleanStudents));
+        localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(cleanActivities));
         localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
         this.isSyncing = false;
         return true;
@@ -56,9 +99,6 @@ export class LocalDatabaseService {
     return false;
   }
 
-  /**
-   * Push current local DB to Cloud
-   */
   public async syncToCloud(): Promise<boolean> {
     try {
       const students = this.getStudents();
@@ -77,7 +117,9 @@ export class LocalDatabaseService {
   public getStudents(): Student[] {
     try {
       const data = localStorage.getItem(STUDENTS_KEY);
-      return data ? JSON.parse(data) : INITIAL_STUDENTS;
+      const rawStudents: Student[] = data ? JSON.parse(data) : INITIAL_STUDENTS;
+      const deletedSet = this.getDeletedStudentIds();
+      return rawStudents.filter((s) => !deletedSet.has(s.StudentID));
     } catch {
       return INITIAL_STUDENTS;
     }
@@ -111,13 +153,23 @@ export class LocalDatabaseService {
   public getActivities(): Activity[] {
     try {
       const data = localStorage.getItem(ACTIVITIES_KEY);
-      return data ? JSON.parse(data) : INITIAL_ACTIVITIES;
+      const rawActivities: Activity[] = data ? JSON.parse(data) : INITIAL_ACTIVITIES;
+      const deletedActivities = this.getDeletedActivityIds();
+      const deletedStudents = this.getDeletedStudentIds();
+      return rawActivities.filter(
+        (a) => !deletedActivities.has(a.ActivityID) && !deletedStudents.has(a.StudentID)
+      );
     } catch {
       return INITIAL_ACTIVITIES;
     }
   }
 
   public getActivitiesForStudent(studentId: string): Activity[] {
+    const deletedStudents = this.getDeletedStudentIds();
+    if (deletedStudents.has(studentId)) {
+      return [];
+    }
+
     const allActivities = this.getActivities();
     return allActivities
       .filter((act) => act.StudentID === studentId)
@@ -131,13 +183,11 @@ export class LocalDatabaseService {
 
   public saveStudents(students: Student[]): void {
     localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-    // Trigger background push to cloud
     this.syncToCloud();
   }
 
   public saveActivities(activities: Activity[]): void {
     localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(activities));
-    // Trigger background push to cloud
     this.syncToCloud();
   }
 
@@ -159,11 +209,19 @@ export class LocalDatabaseService {
     this.saveStudents(students);
   }
 
+  /**
+   * PERMANENT DELETION: Removes student from LocalStorage, registers tombstone, and cascades activity deletion
+   */
   public deleteStudent(studentId: string): void {
+    this.addDeletedStudentId(studentId);
+
     const students = this.getStudents().filter((s) => s.StudentID !== studentId);
-    this.saveStudents(students);
+    localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+
     const activities = this.getActivities().filter((a) => a.StudentID !== studentId);
-    this.saveActivities(activities);
+    localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(activities));
+
+    this.syncToCloud();
   }
 
   public addActivity(activity: Omit<Activity, 'ActivityID'> & { ActivityID?: string }): Activity {
@@ -183,12 +241,21 @@ export class LocalDatabaseService {
     this.saveActivities(activities);
   }
 
+  /**
+   * PERMANENT DELETION: Removes activity from LocalStorage, registers tombstone, and syncs
+   */
   public deleteActivity(activityId: string): void {
+    this.addDeletedActivityId(activityId);
+
     const activities = this.getActivities().filter((a) => a.ActivityID !== activityId);
-    this.saveActivities(activities);
+    localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(activities));
+
+    this.syncToCloud();
   }
 
   public resetToSampleData(): void {
+    localStorage.removeItem(DELETED_STUDENTS_KEY);
+    localStorage.removeItem(DELETED_ACTIVITIES_KEY);
     localStorage.setItem(STUDENTS_KEY, JSON.stringify(INITIAL_STUDENTS));
     localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(INITIAL_ACTIVITIES));
     this.syncToCloud();

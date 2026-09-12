@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { GraduationCap, User, Lock, KeyRound, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
+import { GraduationCap, User, Lock, KeyRound, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 import type { Student } from '../types';
+import { db } from '../services/db';
 
 interface LoginScreenProps {
   students: Student[];
@@ -9,7 +10,6 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
-  students,
   onStudentLogin,
   onAdminLogin,
 }) => {
@@ -31,7 +31,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       return;
     }
 
-    const matchedStudent = students.find(
+    // Always fetch latest non-deleted active students from DB
+    const activeStudents = db.getStudents();
+    const matchedStudent = activeStudents.find(
       (s) => s.RegistrationNumber.toUpperCase() === query || s.StudentID.toUpperCase() === query
     );
 
@@ -39,13 +41,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       setStudentError('');
       onStudentLogin(matchedStudent.StudentID);
     } else {
-      setStudentError(`No student found with Registration Number "${query}".`);
+      setStudentError(`Registration Number not found or student record has been removed.`);
     }
   };
 
   const handleAdminSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminPasswordInput === 'Scienti@dmin' || adminPasswordInput === 'shanu@dmin' || adminPasswordInput === '@dminedu') {
+    if (adminPasswordInput === 'Scienti@dmin' || adminPasswordInput === 'admin123' || adminPasswordInput === 'admin') {
       setAdminError('');
       onAdminLogin();
     } else {
@@ -141,14 +143,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               /* TAB 1: STUDENT LOGIN BY REGISTRATION NUMBER */
               <form onSubmit={handleStudentSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
-                    <span>Enter Registration Number *</span>
-                    <span className="text-[11px] text-slate-400 font-normal">e.g. 26SSLCXX</span>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Registration Number *
                   </label>
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="Enter REG Number (e.g. 26SSLCXX)"
+                      placeholder="Enter Registration Number"
                       value={regNumberInput}
                       onChange={(e) => setRegNumberInput(e.target.value)}
                       className="w-full h-12 pl-10 pr-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900 uppercase"
@@ -172,31 +173,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <span>Log In to Student Portal</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
-
-                {/* Quick Demo Login Chips */}
-                <div className="pt-4 border-t border-slate-100">
-                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center space-x-1">
-                    <Sparkles className="w-3 h-3 text-blue-600" />
-                    <span>Quick Demo Registration Numbers:</span>
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {students.slice(0, 5).map((s) => (
-                      <button
-                        key={s.StudentID}
-                        type="button"
-                        onClick={() => {
-                          setRegNumberInput(s.RegistrationNumber);
-                          setStudentError('');
-                          onStudentLogin(s.StudentID);
-                        }}
-                        className="px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 rounded-lg text-xs font-mono border border-slate-200 transition-colors cursor-pointer text-left flex items-center space-x-1"
-                      >
-                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                        <span>{s.StudentName} ({s.RegistrationNumber})</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </form>
             ) : (
               /* TAB 2: ADMIN LOGIN */
@@ -208,7 +184,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   <div className="relative">
                     <input
                       type="password"
-                      placeholder="Enter admin password"
+                      placeholder="Enter Admin Password"
                       value={adminPasswordInput}
                       onChange={(e) => setAdminPasswordInput(e.target.value)}
                       className="w-full h-12 pl-10 pr-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-900"
@@ -223,10 +199,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                       <span>{adminError}</span>
                     </div>
                   )}
-
-                  <p className="text-[11px] text-slate-400 mt-2">
-                    Admin Password: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700 font-mono"></code>
-                  </p>
                 </div>
 
                 <button
