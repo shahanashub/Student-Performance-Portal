@@ -52,6 +52,10 @@ export function App() {
 
   useEffect(() => {
     refreshData();
+    // Silently pull latest cloud data on load to keep Phone & Desktop in sync
+    db.syncFromCloudSilently().then((updated) => {
+      if (updated) refreshData();
+    });
   }, []);
 
   // Filter students based on selected class and search query (for Admin view)
@@ -133,7 +137,7 @@ export function App() {
     return students.find((s) => s.StudentID === activeStudentId);
   }, [students, activeStudentId]);
 
-  // Get activities for currently selected student (Hidden missing activities enforced)
+  // Get activities for currently selected student
   const currentStudentActivities = useMemo<Activity[]>(() => {
     if (!activeStudentId) return [];
     return db.getActivitiesForStudent(activeStudentId);
@@ -179,6 +183,7 @@ export function App() {
         onOpenAdmin={() => setIsAdminModalOpen(true)}
         onOpenImportExport={() => setIsImportExportOpen(true)}
         onResetSampleData={handleResetSampleData}
+        onDataRefreshed={refreshData}
       />
 
       {/* MAIN CONTAINER */}

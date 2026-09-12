@@ -1,15 +1,20 @@
 import type { Student, Activity } from '../types';
 import { INITIAL_STUDENTS, INITIAL_ACTIVITIES } from './sampleData';
+import { pushToCloud, fetchFromCloud, getStoredSyncId } from './cloudSync';
 
 const STUDENTS_KEY = 'spp_students_v1';
 const ACTIVITIES_KEY = 'spp_activities_v1';
 const ADMIN_AUTH_KEY = 'spp_admin_auth_v1';
+const LAST_SYNC_KEY = 'spp_last_cloud_sync_v1';
 
 export class LocalDatabaseService {
   private static instance: LocalDatabaseService;
+  private isSyncing = false;
 
   private constructor() {
     this.initDatabase();
+    // Auto-fetch latest cloud data on startup to sync across mobile & desktop
+    this.syncFromCloudSilently();
   }
 
   public static getInstance(): LocalDatabaseService {
@@ -25,6 +30,47 @@ export class LocalDatabaseService {
     }
     if (!localStorage.getItem(ACTIVITIES_KEY)) {
       localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(INITIAL_ACTIVITIES));
+    }
+  }
+
+  /**
+   * Silently pull latest student records from Cloud to ensure Mobile & PC match
+   */
+  public async syncFromCloudSilently(): Promise<boolean> {
+    if (this.isSyncing) return false;
+    this.isSyncing = true;
+    try {
+      const syncId = getStoredSyncId();
+      const cloudData = await fetchFromCloud(syncId);
+      if (cloudData && cloudData.students && cloudData.students.length > 0) {
+        localStorage.setItem(STUDENTS_KEY, JSON.stringify(cloudData.students));
+        localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(cloudData.activities || []));
+        localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+        this.isSyncing = false;
+        return true;
+      }
+    } catch (e) {
+      console.warn('Silent cloud sync error:', e);
+    }
+    this.isSyncing = false;
+    return false;
+  }
+
+  /**
+   * Push current local DB to Cloud
+   */
+  public async syncToCloud(): Promise<boolean> {
+    try {
+      const students = this.getStudents();
+      const activities = this.getActivities();
+      const syncId = getStoredSyncId();
+      const success = await pushToCloud(students, activities, syncId);
+      if (success) {
+        localStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+      }
+      return success;
+    } catch {
+      return false;
     }
   }
 
@@ -85,10 +131,14 @@ export class LocalDatabaseService {
 
   public saveStudents(students: Student[]): void {
     localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
+    // Trigger background push to cloud
+    this.syncToCloud();
   }
 
   public saveActivities(activities: Activity[]): void {
     localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(activities));
+    // Trigger background push to cloud
+    this.syncToCloud();
   }
 
   public addStudent(student: Omit<Student, 'StudentID'> & { StudentID?: string }): Student {
@@ -141,6 +191,7 @@ export class LocalDatabaseService {
   public resetToSampleData(): void {
     localStorage.setItem(STUDENTS_KEY, JSON.stringify(INITIAL_STUDENTS));
     localStorage.setItem(ACTIVITIES_KEY, JSON.stringify(INITIAL_ACTIVITIES));
+    this.syncToCloud();
   }
 
   public bulkImport(newStudents: Student[], newActivities: Activity[]): { addedStudents: number; addedActivities: number } {
@@ -185,6 +236,10 @@ export class LocalDatabaseService {
     } else {
       localStorage.removeItem(ADMIN_AUTH_KEY);
     }
+  }
+
+  public getLastSyncTime(): string | null {
+    return localStorage.getItem(LAST_SYNC_KEY);
   }
 }
 

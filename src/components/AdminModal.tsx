@@ -138,7 +138,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden my-8">
-        
+
         {/* Modal Header */}
         <div className="bg-slate-900 text-white p-4 sm:p-5 flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -213,26 +213,24 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           </div>
         ) : (
           <div className="p-4 sm:p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-            
+
             <div className="flex border-b border-slate-200">
               <button
                 onClick={() => setActiveTab('students')}
-                className={`py-2.5 px-4 font-semibold text-xs sm:text-sm border-b-2 flex items-center space-x-2 transition-colors ${
-                  activeTab === 'students'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
+                className={`py-2.5 px-4 font-semibold text-xs sm:text-sm border-b-2 flex items-center space-x-2 transition-colors ${activeTab === 'students'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
               >
                 <UserPlus className="w-4 h-4" />
                 <span>Student Profiles ({students.length})</span>
               </button>
               <button
                 onClick={() => setActiveTab('activities')}
-                className={`py-2.5 px-4 font-semibold text-xs sm:text-sm border-b-2 flex items-center space-x-2 transition-colors ${
-                  activeTab === 'activities'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
+                className={`py-2.5 px-4 font-semibold text-xs sm:text-sm border-b-2 flex items-center space-x-2 transition-colors ${activeTab === 'activities'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
               >
                 <FilePlus className="w-4 h-4" />
                 <span>Activity & Marks Entry</span>
