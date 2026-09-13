@@ -56,6 +56,16 @@ export class LocalDatabaseService {
     localStorage.setItem(DELETED_STUDENTS_KEY, JSON.stringify(Array.from(set)));
   }
 
+  public removeDeletedStudentId(id: string): void {
+    if (!id) return;
+    const set = this.getDeletedStudentIds();
+    const cleanId = id.trim().toUpperCase();
+    if (set.has(cleanId)) {
+      set.delete(cleanId);
+      localStorage.setItem(DELETED_STUDENTS_KEY, JSON.stringify(Array.from(set)));
+    }
+  }
+
   public isStudentDeleted(query: string): boolean {
     if (!query) return false;
     const set = this.getDeletedStudentIds();
@@ -76,6 +86,16 @@ export class LocalDatabaseService {
     const set = this.getDeletedActivityIds();
     set.add(id.trim().toUpperCase());
     localStorage.setItem(DELETED_ACTIVITIES_KEY, JSON.stringify(Array.from(set)));
+  }
+
+  public removeDeletedActivityId(id: string): void {
+    if (!id) return;
+    const set = this.getDeletedActivityIds();
+    const cleanId = id.trim().toUpperCase();
+    if (set.has(cleanId)) {
+      set.delete(cleanId);
+      localStorage.setItem(DELETED_ACTIVITIES_KEY, JSON.stringify(Array.from(set)));
+    }
   }
 
   public isActivityDeleted(id: string): boolean {
@@ -220,7 +240,6 @@ export class LocalDatabaseService {
   }
 
   public addStudent(student: Omit<Student, 'StudentID'> & { StudentID?: string }): Student {
-    const students = this.getStudents();
     const newId = student.StudentID || `STU-${Date.now().toString().slice(-4)}`;
     
     // Auto-generate Registration Number if blank
@@ -228,14 +247,20 @@ export class LocalDatabaseService {
       ? student.RegistrationNumber.trim()
       : `REG-2026-${Math.floor(100 + Math.random() * 900)}`;
 
+    // Clear previous deletion tombstones if re-adding/re-creating
+    this.removeDeletedStudentId(newId);
+    this.removeDeletedStudentId(regNo);
+
     const newStudent: Student = {
       ...student,
       StudentID: newId,
       RegistrationNumber: regNo,
       CreatedAt: new Date().toISOString(),
     };
-    students.push(newStudent);
-    this.saveStudents(students);
+
+    const currentStudents = this.getStudents().filter((s) => s.StudentID !== newId);
+    currentStudents.push(newStudent);
+    this.saveStudents(currentStudents);
     return newStudent;
   }
 
@@ -243,8 +268,11 @@ export class LocalDatabaseService {
     const regNo = updated.RegistrationNumber && updated.RegistrationNumber.trim() !== ''
       ? updated.RegistrationNumber.trim()
       : `REG-2026-${updated.StudentID.replace(/\D/g, '') || Math.floor(100 + Math.random() * 900)}`;
-    const sanitized = { ...updated, RegistrationNumber: regNo };
 
+    this.removeDeletedStudentId(updated.StudentID);
+    this.removeDeletedStudentId(regNo);
+
+    const sanitized = { ...updated, RegistrationNumber: regNo };
     const students = this.getStudents().map((s) => (s.StudentID === updated.StudentID ? sanitized : s));
     this.saveStudents(students);
   }
@@ -273,6 +301,9 @@ export class LocalDatabaseService {
   public addActivity(activity: Omit<Activity, 'ActivityID'> & { ActivityID?: string }): Activity {
     const activities = this.getActivities();
     const newId = activity.ActivityID || `ACT-${Date.now().toString().slice(-6)}`;
+    
+    if (activity.ActivityID) this.removeDeletedActivityId(activity.ActivityID);
+
     const newActivity: Activity = {
       ...activity,
       ActivityID: newId,
@@ -283,6 +314,7 @@ export class LocalDatabaseService {
   }
 
   public updateActivity(updated: Activity): void {
+    if (updated.ActivityID) this.removeDeletedActivityId(updated.ActivityID);
     const activities = this.getActivities().map((a) => (a.ActivityID === updated.ActivityID ? updated : a));
     this.saveActivities(activities);
   }
@@ -318,6 +350,9 @@ export class LocalDatabaseService {
         : `REG-2026-${Math.floor(100 + Math.random() * 900)}`;
       const cleanStudent = { ...s, RegistrationNumber: regNo };
 
+      if (s.StudentID) this.removeDeletedStudentId(s.StudentID);
+      this.removeDeletedStudentId(regNo);
+
       if (!studentMap.has(s.StudentID)) {
         studentMap.set(s.StudentID, cleanStudent);
         addedStudents++;
@@ -329,6 +364,7 @@ export class LocalDatabaseService {
     const activityMap = new Map(currentActivities.map((a) => [a.ActivityID, a]));
     let addedActivities = 0;
     newActivities.forEach((a) => {
+      if (a.ActivityID) this.removeDeletedActivityId(a.ActivityID);
       if (!activityMap.has(a.ActivityID)) {
         activityMap.set(a.ActivityID, a);
         addedActivities++;
